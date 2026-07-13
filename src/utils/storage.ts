@@ -5,8 +5,10 @@ import type {
   Settings,
   MetaStorage,
   FolderMetaStorage,
+  FaviconCacheStorage,
+  FaviconCacheEntry,
 } from '@/types';
-import { STORAGE_KEYS, DEFAULT_SETTINGS, MAX_RECENT_ITEMS } from '@/constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, MAX_RECENT_ITEMS, FAVICON_CACHE_TTL } from '@/constants';
 
 // ─── Generic typed storage helpers ──────────────────────────────
 
@@ -134,4 +136,41 @@ export async function getLastFolder(): Promise<string> {
 
 export async function saveLastFolder(folderId: string): Promise<void> {
   await setToStorage(STORAGE_KEYS.LAST_FOLDER, folderId);
+}
+
+// ─── Favicon Cache ──────────────────────────────────────────────
+
+export async function getAllFaviconCache(): Promise<FaviconCacheStorage> {
+  return getFromStorage<FaviconCacheStorage>(STORAGE_KEYS.FAVICON_CACHE, {});
+}
+
+export async function setFaviconCacheEntry(hostname: string, dataUri: string): Promise<void> {
+  const all = await getAllFaviconCache();
+  all[hostname] = { dataUri, timestamp: Date.now() };
+  await setToStorage(STORAGE_KEYS.FAVICON_CACHE, all);
+}
+
+export async function getFaviconCacheEntry(hostname: string): Promise<FaviconCacheEntry | null> {
+  const all = await getAllFaviconCache();
+  const entry = all[hostname];
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > FAVICON_CACHE_TTL) {
+    return null; // expired
+  }
+  return entry;
+}
+
+export async function clearExpiredFaviconCache(): Promise<void> {
+  const all = await getAllFaviconCache();
+  const now = Date.now();
+  let changed = false;
+  for (const hostname of Object.keys(all)) {
+    if (now - all[hostname].timestamp > FAVICON_CACHE_TTL) {
+      delete all[hostname];
+      changed = true;
+    }
+  }
+  if (changed) {
+    await setToStorage(STORAGE_KEYS.FAVICON_CACHE, all);
+  }
 }

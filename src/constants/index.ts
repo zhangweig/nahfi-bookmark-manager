@@ -8,7 +8,14 @@ export const STORAGE_KEYS = {
   RECENT: 'nahfi_recent_visits',
   SETTINGS: 'nahfi_settings',
   LAST_FOLDER: 'nahfi_last_folder',
+  FAVICON_CACHE: 'nahfi_favicon_cache',
 } as const;
+
+// ─── Favicon Cache TTL ──────────────────────────────────────────
+
+// Cache entries expire after 7 days. On read, expired entries are
+// treated as misses and re-fetched from network sources.
+export const FAVICON_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
 // ─── Default Settings ───────────────────────────────────────────
 

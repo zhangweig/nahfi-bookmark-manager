@@ -1,5 +1,5 @@
 // ─── Background Service Worker ──────────────────────────────────
-// Handles extension lifecycle and bookmark change events.
+// Handles extension lifecycle, bookmark change events, and favicon caching.
 // Notifies popup when bookmarks change so it can refresh in real-time.
 
 // On install
@@ -38,6 +38,49 @@ chrome.bookmarks.onMoved.addListener((id, _moveInfo) => {
   notifyPopup('moved');
 });
 
+// ─── Favicon Caching ────────────────────────────────────────────
+
+/**
+ * Fetch an image URL, convert to base64 data URI, and store in chrome.storage.local.
+ * Called by popup when a favicon loads successfully from a network source.
+ */
+async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ success: boolean; dataUri?: string }> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return { success: false };
+
+    const blob = await response.blob();
+    // Skip if not an image or too small (likely a placeholder)
+    if (!blob.type.startsWith('image/') && blob.size < 100) return { success: false };
+
+    const dataUri = await blobToDataUri(blob);
+
+    // Store in chrome.storage.local
+    const result = await new Promise<Record<string, unknown>>((resolve) => {
+      chrome.storage.local.get('nahfi_favicon_cache', (items) => {
+        resolve(items as Record<string, unknown>);
+      });
+    });
+    const cache = (result['nahfi_favicon_cache'] as Record<string, { dataUri: string; timestamp: number }>) ?? {};
+    cache[hostname] = { dataUri, timestamp: Date.now() };
+    await chrome.storage.local.set({ 'nahfi_favicon_cache': cache });
+
+    return { success: true, dataUri };
+  } catch (err) {
+    console.warn('[Nahfi] Favicon cache failed for', hostname, err);
+    return { success: false };
+  }
+}
+
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_BOOKMARK_COUNT') {
@@ -52,6 +95,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       traverse(tree);
       sendResponse({ count });
     });
+    return true; // async response
+  }
+
+  if (message.type === 'CACHE_FAVICON') {
+    fetchAndCacheFavicon(message.url, message.hostname).then(sendResponse);
     return true; // async response
   }
 });

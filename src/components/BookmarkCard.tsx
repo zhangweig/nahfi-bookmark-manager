@@ -8,7 +8,7 @@ import {
   getInitial,
 } from '@/utils/favicon';
 import { cn } from '@/utils/helpers';
-import { CARD_SIZES } from '@/constants';
+import { CARD_SIZES, FAVICON_CACHE_TTL } from '@/constants';
 import { useStore } from '@/store/useStore';
 import { getInternalDragData, setInternalDragData } from '@/utils/drag';
 
@@ -28,6 +28,22 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
   const openContextMenu = useStore((s) => s.openContextMenu);
   const moveNode = useStore((s) => s.moveNode);
   const retryCount = useStore((s) => s.faviconRetryMap[node.id] ?? 0);
+  const setFaviconCacheEntry = useStore((s) => s.setFaviconCacheEntry);
+
+  // Extract hostname for cache lookup
+  const hostname = useMemo(() => {
+    try {
+      return new URL(node.url ?? '').hostname;
+    } catch {
+      return '';
+    }
+  }, [node.url]);
+
+  // Check local favicon cache (from chrome.storage.local, loaded into store on init)
+  const cachedFavicon = useStore((s) =>
+    hostname ? s.faviconCacheMap[hostname] : undefined,
+  );
+  const cacheValid = cachedFavicon && Date.now() - cachedFavicon.timestamp < FAVICON_CACHE_TTL;
 
   // Build the favicon chain once per URL change.
   const faviconChain = useMemo(
@@ -127,13 +143,18 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
 
   const titleText = meta?.customName || node.title || 'Untitled';
 
-  // Resolve current favicon source from the chain.
-  // If we've exhausted the chain (state >= last index), use the avatar.
+  // Resolve current favicon source.
+  // Priority: local cache → network chain → avatar fallback
   const avatarIndex = faviconChain.length - 1; // last entry is always 'avatar'
-  const faviconSrc =
-    faviconState < avatarIndex
+
+  const faviconSrc = cacheValid
+    ? cachedFavicon!.dataUri
+    : faviconState < avatarIndex
       ? faviconChain[faviconState].url
       : generateAvatarDataUri(getInitial(titleText), titleText);
+
+  // Whether we're showing a cached favicon (no network needed)
+  const usingCache = !!cacheValid;
 
   return (
     <div
@@ -164,19 +185,37 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
           sz.iconWrap,
         )}
       >
-        {showFavicon && node.url && faviconState < avatarIndex ? (
+        {showFavicon && node.url && (usingCache || faviconState < avatarIndex) ? (
           <img
-            key={`${node.id}-fav-${faviconState}-${retryCount}`}
+            key={`${node.id}-fav-${usingCache ? 'cache' : faviconState}-${retryCount}`}
             src={faviconSrc}
             alt=""
             className="h-[78%] w-[78%] object-contain drop-shadow-sm"
-            onError={() => setFaviconState((prev) => prev + 1)}
+            onError={() => {
+              if (!usingCache) setFaviconState((prev) => prev + 1);
+            }}
             onLoad={(e) => {
-              // Reject tiny/transparent placeholder images (e.g. 1x1 tracking pixels,
-              // or Chrome's default globe when no favicon is cached).
+              // Reject tiny/transparent placeholder images (e.g. 1x1 tracking pixels)
               const image = e.currentTarget;
               if (image.naturalWidth <= 1 && image.naturalHeight <= 1) {
-                setFaviconState((prev) => prev + 1);
+                if (!usingCache) setFaviconState((prev) => prev + 1);
+                return;
+              }
+
+              // Cache successful favicon from network sources (not cache, not avatar)
+              if (!usingCache && hostname) {
+                const source = faviconChain[faviconState];
+                if (source && source.name !== 'avatar') {
+                  // Ask background SW to fetch + cache this favicon as base64
+                  chrome.runtime.sendMessage(
+                    { type: 'CACHE_FAVICON', url: source.url, hostname },
+                    (response) => {
+                      if (response?.success && response.dataUri) {
+                        setFaviconCacheEntry(hostname, response.dataUri);
+                      }
+                    },
+                  );
+                }
               }
             }}
             loading="lazy"

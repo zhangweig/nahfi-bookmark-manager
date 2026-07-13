@@ -11,6 +11,7 @@ import type {
   ConfirmDialogState,
   MetaStorage,
   FolderMetaStorage,
+  FaviconCacheStorage,
 } from '@/types';
 import { DEFAULT_SETTINGS } from '@/constants';
 import * as bookmarkApi from '@/utils/bookmarks';
@@ -42,6 +43,7 @@ interface StoreState {
   sidebarOpen: boolean;
   scrollPositionMap: Record<string, number>; // folderId -> scrollTop
   faviconRetryMap: Record<string, number>; // bookmarkId -> retry count
+  faviconCacheMap: FaviconCacheStorage; // hostname -> { dataUri, timestamp }
 
   // ── Actions ──
   init: () => Promise<void>;
@@ -69,6 +71,7 @@ interface StoreState {
   setScrollPosition: (folderId: string, scrollTop: number) => void;
   getScrollPosition: (folderId: string) => number;
   retryFavicon: (bookmarkId: string) => void;
+  setFaviconCacheEntry: (hostname: string, dataUri: string) => void;
   setMetaMap: (metaMap: MetaStorage) => void;
   setFolderMetaMap: (folderMetaMap: FolderMetaStorage) => void;
   setRecentVisits: (recentVisits: RecentVisit[]) => void;
@@ -101,6 +104,7 @@ export const useStore = create<StoreState>((set, get) => ({
   sidebarOpen: false,
   scrollPositionMap: {},
   faviconRetryMap: {},
+  faviconCacheMap: {},
 
   // ── Actions ──
 
@@ -108,13 +112,14 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      const [settings, metaMap, folderMetaMap, recentVisits, lastFolder, tree] = await Promise.all([
+      const [settings, metaMap, folderMetaMap, recentVisits, lastFolder, tree, faviconCache] = await Promise.all([
         storage.getSettings(),
         storage.getAllMeta(),
         storage.getAllFolderMeta(),
         storage.getRecentVisits(),
         storage.getLastFolder(),
         bookmarkApi.getBookmarkTree(),
+        storage.getAllFaviconCache(),
       ]);
 
       const allFolders = bookmarkApi.collectFolders(tree);
@@ -127,6 +132,7 @@ export const useStore = create<StoreState>((set, get) => ({
         recentVisits,
         allFolders,
         allBookmarks,
+        faviconCacheMap: faviconCache,
       });
 
       await get().loadFolder(lastFolder);
@@ -359,6 +365,15 @@ export const useStore = create<StoreState>((set, get) => ({
       faviconRetryMap: {
         ...state.faviconRetryMap,
         [bookmarkId]: (state.faviconRetryMap[bookmarkId] ?? 0) + 1,
+      },
+    }));
+  },
+
+  setFaviconCacheEntry: (hostname: string, dataUri: string) => {
+    set((state) => ({
+      faviconCacheMap: {
+        ...state.faviconCacheMap,
+        [hostname]: { dataUri, timestamp: Date.now() },
       },
     }));
   },

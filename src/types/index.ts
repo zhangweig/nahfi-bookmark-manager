@@ -79,3 +79,14 @@ export interface ConfirmDialogState {
   message: string;
   onConfirm: (() => void) | null;
 }
+
+// ─── Favicon Cache ──────────────────────────────────────────────
+
+export interface FaviconCacheEntry {
+  dataUri: string; // base64 data URI
+  timestamp: number; // when cached (ms epoch)
+}
+
+export interface FaviconCacheStorage {
+  [hostname: string]: FaviconCacheEntry;
+}
