@@ -12,6 +12,10 @@ import { CARD_SIZES, FAVICON_CACHE_TTL } from '@/constants';
 import { useStore } from '@/store/useStore';
 import { getInternalDragData, setInternalDragData } from '@/utils/drag';
 
+// Track hostname favicon cache requests per popup session to avoid duplicate
+// background messages when multiple bookmarks share the same domain.
+const faviconCacheRequested = new Set<string>();
+
 interface BookmarkCardProps {
   node: BookmarkNode;
   meta?: BookmarkMeta;
@@ -203,13 +207,20 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
               }
 
               // Cache successful favicon from network sources (not cache, not avatar)
-              if (!usingCache && hostname) {
+              if (!usingCache && hostname && !faviconCacheRequested.has(hostname)) {
+                faviconCacheRequested.add(hostname);
                 const source = faviconChain[faviconState];
                 if (source && source.name !== 'avatar') {
                   // Ask background SW to fetch + cache this favicon as base64
                   chrome.runtime.sendMessage(
                     { type: 'CACHE_FAVICON', url: source.url, hostname },
                     (response) => {
+                      // Always check lastError: popup may close before background responds
+                      if (chrome.runtime.lastError) {
+                        // Remove from requested set so next popup can retry
+                        faviconCacheRequested.delete(hostname);
+                        return;
+                      }
                       if (response?.success && response.dataUri) {
                         setFaviconCacheEntry(hostname, response.dataUri);
                       }

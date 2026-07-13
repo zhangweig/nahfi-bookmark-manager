@@ -12,7 +12,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // Notify popup when bookmarks change
 function notifyPopup(changeType: string) {
   try {
-    chrome.runtime.sendMessage({ type: 'BOOKMARKS_CHANGED', changeType });
+    chrome.runtime.sendMessage({ type: 'BOOKMARKS_CHANGED', changeType }, () => {
+      // Ignore lastError when popup is not open
+      if (chrome.runtime.lastError) {
+        // No-op — this is expected when the popup is closed
+      }
+    });
   } catch {
     // Popup not open — ignore
   }
@@ -99,7 +104,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'CACHE_FAVICON') {
-    fetchAndCacheFavicon(message.url, message.hostname).then(sendResponse);
+    fetchAndCacheFavicon(message.url as string, message.hostname as string)
+      .then((result) => sendResponse(result))
+      .catch(() => sendResponse({ success: false }));
     return true; // async response
   }
 });
