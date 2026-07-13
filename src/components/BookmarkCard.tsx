@@ -1,11 +1,9 @@
-import { memo, useState, useCallback, useRef } from 'react';
+import { memo, useState, useCallback, useRef, useMemo } from 'react';
 import { Pin } from 'lucide-react';
 import type { BookmarkNode, BookmarkMeta, Settings, CardSize } from '@/types';
 import {
   getDomain,
-  getDuckDuckGoFaviconUrl,
-  getFaviconUrl,
-  getChromeFaviconUrl,
+  getFaviconChain,
   generateAvatarDataUri,
   getInitial,
 } from '@/utils/favicon';
@@ -22,13 +20,20 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardProps) {
-  // Favicon state: 0 = Google S2, 1 = Chrome cache, 2 = DuckDuckGo, 3 = avatar
+  // Favicon state: index into the favicon chain.
+  // Chain order: 0=Chrome cache → 1=Direct /favicon.ico → 2=DuckDuckGo → 3=Google → 4=Avatar
   const [faviconState, setFaviconState] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const recordVisit = useStore((s) => s.recordVisit);
   const openContextMenu = useStore((s) => s.openContextMenu);
   const moveNode = useStore((s) => s.moveNode);
   const retryCount = useStore((s) => s.faviconRetryMap[node.id] ?? 0);
+
+  // Build the favicon chain once per URL change.
+  const faviconChain = useMemo(
+    () => getFaviconChain(node.url ?? '', 128),
+    [node.url],
+  );
 
   // When retry is triggered from context menu, reset favicon state to try again
   const prevRetryCount = useRef(retryCount);
@@ -121,12 +126,14 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
   const sz = sizeClasses[cardSize];
 
   const titleText = meta?.customName || node.title || 'Untitled';
+
+  // Resolve current favicon source from the chain.
+  // If we've exhausted the chain (state >= last index), use the avatar.
+  const avatarIndex = faviconChain.length - 1; // last entry is always 'avatar'
   const faviconSrc =
-    faviconState === 0
-      ? getFaviconUrl(node.url ?? '', 128)
-      : faviconState === 1
-        ? getChromeFaviconUrl(node.url ?? '', 128)
-        : getDuckDuckGoFaviconUrl(node.url ?? '');
+    faviconState < avatarIndex
+      ? faviconChain[faviconState].url
+      : generateAvatarDataUri(getInitial(titleText), titleText);
 
   return (
     <div
@@ -157,7 +164,7 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
           sz.iconWrap,
         )}
       >
-        {showFavicon && node.url && faviconState < 3 ? (
+        {showFavicon && node.url && faviconState < avatarIndex ? (
           <img
             key={`${node.id}-fav-${faviconState}-${retryCount}`}
             src={faviconSrc}
@@ -165,9 +172,11 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
             className="h-[78%] w-[78%] object-contain drop-shadow-sm"
             onError={() => setFaviconState((prev) => prev + 1)}
             onLoad={(e) => {
+              // Reject tiny/transparent placeholder images (e.g. 1x1 tracking pixels,
+              // or Chrome's default globe when no favicon is cached).
               const image = e.currentTarget;
-              if (image.naturalWidth <= 32 && image.naturalHeight <= 32) {
-                setFaviconState(3);
+              if (image.naturalWidth <= 1 && image.naturalHeight <= 1) {
+                setFaviconState((prev) => prev + 1);
               }
             }}
             loading="lazy"

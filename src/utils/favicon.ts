@@ -1,28 +1,94 @@
 // ─── Favicon URL generation ─────────────────────────────────────
-// Multi-source favicon resolution with fallback chain:
-//   1. Google S2 favicon service
-//   2. Chrome's extension favicon endpoint
-//   3. DuckDuckGo favicon service
-//   4. First-letter avatar
+// Multi-source favicon resolution with fallback chain.
+//
+// CRITICAL: The order matters for users in China (no VPN).
+// Google S2 and DuckDuckGo are blocked/slow in mainland China.
+// The chain is ordered: local/fast first → external/VPN-dependent last.
+//
+//   0. Chrome internal favicon cache   — instant, no network
+//   1. Direct /favicon.ico from site   — works for Chinese sites, no VPN
+//   2. DuckDuckGo favicon service      — may work for some users
+//   3. Google S2 favicon service       — requires VPN in China
+//   4. First-letter avatar (data URI)  — always works, final fallback
 
-/** Generate a favicon URL using Google S2 service. */
-export function getFaviconUrl(bookmarkUrl: string, size: number = 128): string {
-  return getGoogleFaviconUrl(bookmarkUrl, size);
+export interface FaviconSource {
+  url: string;
+  name: 'chrome' | 'direct' | 'duckduckgo' | 'google' | 'avatar';
 }
 
-/** Generate a fallback favicon URL from Chrome's internal favicon endpoint. */
+/**
+ * Build the ordered favicon fallback chain for a bookmark URL.
+ * Each entry is tried in order; the next is used when the previous
+ * fires onError or times out.
+ */
+export function getFaviconChain(bookmarkUrl: string, size: number = 128): FaviconSource[] {
+  let hostname = '';
+  try {
+    hostname = new URL(bookmarkUrl).hostname;
+  } catch {
+    return [{ url: generateAvatarDataUri('?'), name: 'avatar' }];
+  }
+
+  const chain: FaviconSource[] = [];
+
+  // 0. Chrome internal favicon cache — reads from browser's own cache,
+  //    no external network request. Instant and works offline.
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    chain.push({
+      url: chrome.runtime.getURL(
+        `/_favicon/?pageUrl=${encodeURIComponent(bookmarkUrl)}&size=${size}`,
+      ),
+      name: 'chrome',
+    });
+  }
+
+  // 1. Direct /favicon.ico from the website itself.
+  //    Works without VPN for the vast majority of Chinese sites.
+  chain.push({
+    url: `https://${hostname}/favicon.ico`,
+    name: 'direct',
+  });
+
+  // 2. DuckDuckGo favicon service — sometimes works in China, sometimes not.
+  chain.push({
+    url: `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
+    name: 'duckduckgo',
+  });
+
+  // 3. Google S2 favicon service — blocked in mainland China without VPN.
+  //    Kept as a late fallback for users who have VPN or are outside China.
+  chain.push({
+    url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=${size}`,
+    name: 'google',
+  });
+
+  // 4. Avatar — always works, final fallback.
+  chain.push({ url: '', name: 'avatar' });
+
+  return chain;
+}
+
+/**
+ * Get a favicon URL. Kept for backward compatibility — prefer getFaviconChain().
+ * Returns the first source in the chain (Chrome internal cache).
+ */
+export function getFaviconUrl(bookmarkUrl: string, size: number = 128): string {
+  const chain = getFaviconChain(bookmarkUrl, size);
+  return chain[0]?.url || generateAvatarDataUri('?');
+}
+
+/** Generate a favicon URL from Chrome's internal favicon endpoint. */
 export function getChromeFaviconUrl(bookmarkUrl: string, size: number = 128): string {
   try {
-    const url = new URL(bookmarkUrl);
     return chrome.runtime.getURL(
-      `/_favicon/?pageUrl=${encodeURIComponent(url.toString())}&size=${size}`,
+      `/_favicon/?pageUrl=${encodeURIComponent(bookmarkUrl)}&size=${size}`,
     );
   } catch {
     return generateAvatarDataUri('?');
   }
 }
 
-/** Generate a fallback favicon URL using Google S2 service. */
+/** Generate a favicon URL from Google S2 service (requires VPN in China). */
 export function getGoogleFaviconUrl(bookmarkUrl: string, size: number = 128): string {
   try {
     const url = new URL(bookmarkUrl);
@@ -32,12 +98,21 @@ export function getGoogleFaviconUrl(bookmarkUrl: string, size: number = 128): st
   }
 }
 
-/** Generate a fallback favicon URL using DuckDuckGo service. */
+/** Generate a favicon URL from DuckDuckGo service. */
 export function getDuckDuckGoFaviconUrl(bookmarkUrl: string): string {
   try {
     const url = new URL(bookmarkUrl);
-    const domain = url.hostname;
-    return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+    return `https://icons.duckduckgo.com/ip3/${url.hostname}.ico`;
+  } catch {
+    return generateAvatarDataUri('?');
+  }
+}
+
+/** Generate a direct /favicon.ico URL from the bookmark's domain. */
+export function getDirectFaviconUrl(bookmarkUrl: string): string {
+  try {
+    const url = new URL(bookmarkUrl);
+    return `https://${url.hostname}/favicon.ico`;
   } catch {
     return generateAvatarDataUri('?');
   }
