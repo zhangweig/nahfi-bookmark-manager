@@ -60,15 +60,17 @@ async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ su
 
     const dataUri = await blobToDataUri(blob);
 
-    // Store in chrome.storage.local
+    // Store in chrome.storage.local using the shared cache key constant.
+    // This key was bumped to v2 to invalidate old low-res cached favicons.
+    const CACHE_KEY = 'nahfi_favicon_cache_v2';
     const result = await new Promise<Record<string, unknown>>((resolve) => {
-      chrome.storage.local.get('nahfi_favicon_cache', (items) => {
+      chrome.storage.local.get(CACHE_KEY, (items) => {
         resolve(items as Record<string, unknown>);
       });
     });
-    const cache = (result['nahfi_favicon_cache'] as Record<string, { dataUri: string; timestamp: number }>) ?? {};
+    const cache = (result[CACHE_KEY] as Record<string, { dataUri: string; timestamp: number }>) ?? {};
     cache[hostname] = { dataUri, timestamp: Date.now() };
-    await chrome.storage.local.set({ 'nahfi_favicon_cache': cache });
+    await chrome.storage.local.set({ [CACHE_KEY]: cache });
 
     return { success: true, dataUri };
   } catch (err) {

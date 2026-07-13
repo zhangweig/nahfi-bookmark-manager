@@ -50,8 +50,9 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
   const cacheValid = cachedFavicon && Date.now() - cachedFavicon.timestamp < FAVICON_CACHE_TTL;
 
   // Build the favicon chain once per URL change.
+  // Request size=256 for crisp icons on high-DPI (Retina) displays.
   const faviconChain = useMemo(
-    () => getFaviconChain(node.url ?? '', 128),
+    () => getFaviconChain(node.url ?? '', 256),
     [node.url],
   );
 
