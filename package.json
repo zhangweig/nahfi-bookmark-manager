@@ -1,0 +1,57 @@
+{
+  "name": "nahfi-bookmark-manager",
+  "version": "1.0.0",
+  "description": "A modern, high-performance Chrome bookmark manager with glassmorphism UI",
+  "author": "Zhang WeiGuang",
+  "license": "MIT",
+  "keywords": [
+    "chrome-extension",
+    "bookmark-manager",
+    "bookmarks",
+    "react",
+    "typescript",
+    "vite",
+    "tailwindcss"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangweig/nahfi-bookmark-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhangweig/nahfi-bookmark-manager/issues"
+  },
+  "homepage": "https://github.com/zhangweig/nahfi-bookmark-manager#readme",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.408.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268.0",
+    "@types/node": "^26.1.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "postcss": "^8.4.39",
+    "prettier": "^3.3.3",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}
