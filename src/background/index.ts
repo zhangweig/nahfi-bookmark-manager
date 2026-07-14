@@ -2,6 +2,8 @@
 // Handles extension lifecycle, bookmark change events, and favicon caching.
 // Notifies popup when bookmarks change so it can refresh in real-time.
 
+import { STORAGE_KEYS, FAVICON_MIN_SIZE } from '@/constants';
+
 // On install
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
@@ -56,20 +58,23 @@ async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ su
 
     const blob = await response.blob();
     // Skip if not an image or too small (likely a placeholder)
-    if (!blob.type.startsWith('image/') && blob.size < 100) return { success: false };
+    if (!blob.type.startsWith('image/') || blob.size < 100) return { success: false };
 
     const dataUri = await blobToDataUri(blob);
 
-    // Reject low-resolution images (same threshold as BookmarkCard's onLoad).
-    // Parse the base64 image dimensions to ensure we only cache HD favicons.
+    // Reject low-resolution images. Uses the same threshold as BookmarkCard's
+    // onLoad handler (FAVICON_MIN_SIZE from constants). For direct sources
+    // (apple-touch-icon, favicon.ico) the image dimensions reflect the true
+    // resolution. For Google S2, the service always returns the requested size
+    // (256) so this check is a no-op — by the time we reach Google in the chain,
+    // all China-accessible sources have already failed.
     const dims = await getImageDimensions(dataUri);
-    if (dims.width < 128 || dims.height < 128) {
+    if (dims.width < FAVICON_MIN_SIZE || dims.height < FAVICON_MIN_SIZE) {
       return { success: false };
     }
 
     // Store in chrome.storage.local using the shared cache key constant.
-    // v4: invalidated v3 cache entries that may contain 32px-127px icons.
-    const CACHE_KEY = 'nahfi_favicon_cache_v4';
+    const CACHE_KEY = STORAGE_KEYS.FAVICON_CACHE;
     const result = await new Promise<Record<string, unknown>>((resolve) => {
       chrome.storage.local.get(CACHE_KEY, (items) => {
         resolve(items as Record<string, unknown>);
@@ -95,7 +100,7 @@ function blobToDataUri(blob: Blob): Promise<string> {
   });
 }
 
-/** Parse image dimensions from a data URI using OffscreenCanvas. */
+/** Parse image dimensions from a data URI using createImageBitmap. */
 async function getImageDimensions(dataUri: string): Promise<{ width: number; height: number }> {
   try {
     const response = await fetch(dataUri);

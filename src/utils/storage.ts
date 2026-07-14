@@ -174,3 +174,19 @@ export async function clearExpiredFaviconCache(): Promise<void> {
     await setToStorage(STORAGE_KEYS.FAVICON_CACHE, all);
   }
 }
+
+export async function clearAllFaviconCache(): Promise<void> {
+  await chrome.storage.local.remove(STORAGE_KEYS.FAVICON_CACHE);
+}
+
+// Clean up old version caches (v1-v5) to free storage space
+export async function cleanupOldFaviconCaches(): Promise<void> {
+  const oldKeys = [
+    'nahfi_favicon_cache',
+    'nahfi_favicon_cache_v2',
+    'nahfi_favicon_cache_v3',
+    'nahfi_favicon_cache_v4',
+    'nahfi_favicon_cache_v5',
+  ];
+  await chrome.storage.local.remove(oldKeys);
+}

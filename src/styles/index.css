@@ -232,6 +232,34 @@ body {
   transition: none !important;
 }
 
+/* ─── Favicon sharp rendering ──────────────────────────────────── */
+/* Optimize favicon display for high-DPI screens. Chrome's default
+   image scaling can produce soft/blurry edges on small icons. */
+
+.favicon-sharp {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Favicon background plate — gives transparent icons a solid base,
+   making them appear sharper and more consistent across all sites. */
+.favicon-bg {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.dark .favicon-bg {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 /* ─── Smooth transitions for theme switch ─────────────────────── */
 
 body {

@@ -6,10 +6,9 @@ import {
   getFaviconChain,
   generateAvatarDataUri,
   getInitial,
-  FAVICON_MIN_SIZE,
 } from '@/utils/favicon';
 import { cn } from '@/utils/helpers';
-import { CARD_SIZES, FAVICON_CACHE_TTL } from '@/constants';
+import { CARD_SIZES, FAVICON_CACHE_TTL, FAVICON_MIN_SIZE } from '@/constants';
 import { useStore } from '@/store/useStore';
 import { getInternalDragData, setInternalDragData } from '@/utils/drag';
 
@@ -26,8 +25,8 @@ interface BookmarkCardProps {
 
 function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardProps) {
   // Favicon state: index into the favicon chain.
-  // Chain order: 0=apple-touch (180) → 1=apple-touch-precomposed → 2=android-chrome (192)
-  // → 3=Chrome cache → 4=Direct /favicon.ico → 5=DuckDuckGo → 6=Google → 7=Avatar
+  // Chain: 0=apple-touch(180) → 1=precomposed → 2=android-chrome(192)
+  //        → 3=Chrome cache → 4=favicon.ico → 5=DuckDuckGo → 6=Google → 7=Avatar
   const [faviconState, setFaviconState] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const recordVisit = useStore((s) => s.recordVisit);
@@ -52,7 +51,7 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
   const cacheValid = cachedFavicon && Date.now() - cachedFavicon.timestamp < FAVICON_CACHE_TTL;
 
   // Build the favicon chain once per URL change.
-  // Request size=256 for crisp icons on high-DPI (Retina) displays.
+  // Request size=256 for crisp icons on high-DPI (Retina / 2x) displays.
   const faviconChain = useMemo(
     () => getFaviconChain(node.url ?? '', 256),
     [node.url],
@@ -193,19 +192,22 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
         )}
       >
         {showFavicon && node.url && (usingCache || faviconState < avatarIndex) ? (
-          <img
-            key={`${node.id}-fav-${usingCache ? 'cache' : faviconState}-${retryCount}`}
-            src={faviconSrc}
-            alt=""
-            className="h-[78%] w-[78%] object-contain drop-shadow-sm"
-            onError={() => {
-              if (!usingCache) setFaviconState((prev) => prev + 1);
-            }}
+          <div className="favicon-bg flex h-[78%] w-[78%] items-center justify-center rounded-xl">
+            <img
+              key={`${node.id}-fav-${usingCache ? 'cache' : faviconState}-${retryCount}`}
+              src={faviconSrc}
+              alt=""
+              className="h-full w-full object-contain favicon-sharp"
+              onError={() => {
+                if (!usingCache) setFaviconState((prev) => prev + 1);
+              }}
             onLoad={(e) => {
               // Reject low-resolution images that will look blurry when
               // scaled up to fill the card. Images below 128×128 are rejected;
-              // 128×128+ are accepted and cached. This forces the chain to
-              // advance past Chrome's internal cache and low-res /favicon.ico.
+              // 128×128+ are accepted and cached. This is effective for direct
+              // sources (apple-touch, favicon.ico) where naturalWidth is the
+              // real resolution. Google S2 always returns the requested size
+              // so the threshold is a no-op for it.
               const image = e.currentTarget;
               if (image.naturalWidth < FAVICON_MIN_SIZE || image.naturalHeight < FAVICON_MIN_SIZE) {
                 if (!usingCache) setFaviconState((prev) => prev + 1);
@@ -238,6 +240,7 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
             loading="lazy"
             draggable={false}
           />
+          </div>
         ) : (
           /* First-letter avatar — colorful gradient + white letter */
           <img

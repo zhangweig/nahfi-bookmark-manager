@@ -8,11 +8,27 @@ export const STORAGE_KEYS = {
   RECENT: 'nahfi_recent_visits',
   SETTINGS: 'nahfi_settings',
   LAST_FOLDER: 'nahfi_last_folder',
-  // v4: cache key bumped to invalidate v3 entries that may have cached
-  // 32px-127px favicons. The new threshold is 128px: only icons with both
-  // dimensions >= 128px are accepted and cached.
-  FAVICON_CACHE: 'nahfi_favicon_cache_v4',
+  // v6: multi-source chain restored. Previous v5 used Google S2 as the
+  // sole source (blocked in China → all icons fell back to letter avatars)
+  // with a 160px threshold that was ineffective (Google S2 always returns
+  // the requested size regardless of the original favicon resolution).
+  // v6 restores apple-touch-icon / android-chrome / favicon.ico / etc.
+  // as earlier sources so China users get real icons, and lowers the
+  // threshold to 128px (the user-requested value).
+  FAVICON_CACHE: 'nahfi_favicon_cache_v6',
 } as const;
+
+// ─── Favicon Quality Threshold ──────────────────────────────────
+// Minimum acceptable image dimension (both width AND height).
+// Images below this are rejected by BookmarkCard's onLoad handler
+// and by the background SW's cache validator.
+// 128px: rejects 16×16 / 32×32 / 64×64 / 96×96 icons.
+// Accepted: apple-touch-icon (180), android-chrome (192), etc.
+// NOTE: Google S2 always returns the requested size (256) regardless
+// of the original resolution, so this threshold is a no-op for it.
+// It IS effective for direct sources where naturalWidth reflects
+// the true image resolution.
+export const FAVICON_MIN_SIZE = 128;
 
 // ─── Favicon Cache TTL ──────────────────────────────────────────
 

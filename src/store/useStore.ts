@@ -72,6 +72,7 @@ interface StoreState {
   getScrollPosition: (folderId: string) => number;
   retryFavicon: (bookmarkId: string) => void;
   setFaviconCacheEntry: (hostname: string, dataUri: string) => void;
+  clearFaviconCache: () => Promise<void>;
   setMetaMap: (metaMap: MetaStorage) => void;
   setFolderMetaMap: (folderMetaMap: FolderMetaStorage) => void;
   setRecentVisits: (recentVisits: RecentVisit[]) => void;
@@ -111,6 +112,9 @@ export const useStore = create<StoreState>((set, get) => ({
   init: async () => {
     try {
       set({ isLoading: true, error: null });
+
+      // Clean up old version caches in the background (don't await)
+      storage.cleanupOldFaviconCaches().catch(() => {});
 
       const [settings, metaMap, folderMetaMap, recentVisits, lastFolder, tree, faviconCache] = await Promise.all([
         storage.getSettings(),
@@ -376,6 +380,11 @@ export const useStore = create<StoreState>((set, get) => ({
         [hostname]: { dataUri, timestamp: Date.now() },
       },
     }));
+  },
+
+  clearFaviconCache: async () => {
+    await storage.clearAllFaviconCache();
+    set({ faviconCacheMap: {} });
   },
 }));
 
