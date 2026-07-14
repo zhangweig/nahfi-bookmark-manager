@@ -26,7 +26,8 @@ interface BookmarkCardProps {
 
 function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardProps) {
   // Favicon state: index into the favicon chain.
-  // Chain order: 0=Chrome cache → 1=Direct /favicon.ico → 2=DuckDuckGo → 3=Google → 4=Avatar
+  // Chain order: 0=apple-touch (180) → 1=apple-touch-precomposed → 2=android-chrome (192)
+  // → 3=Chrome cache → 4=Direct /favicon.ico → 5=DuckDuckGo → 6=Google → 7=Avatar
   const [faviconState, setFaviconState] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const recordVisit = useStore((s) => s.recordVisit);
@@ -202,10 +203,9 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
             }}
             onLoad={(e) => {
               // Reject low-resolution images that will look blurry when
-              // scaled up to fill the card. 16×16 favicons are rejected;
-              // 32×32+ are accepted. This forces the chain to advance past
-              // Chrome's internal cache (which often only has 16×16) to
-              // reach high-res sources like apple-touch-icon (180px).
+              // scaled up to fill the card. Images below 128×128 are rejected;
+              // 128×128+ are accepted and cached. This forces the chain to
+              // advance past Chrome's internal cache and low-res /favicon.ico.
               const image = e.currentTarget;
               if (image.naturalWidth < FAVICON_MIN_SIZE || image.naturalHeight < FAVICON_MIN_SIZE) {
                 if (!usingCache) setFaviconState((prev) => prev + 1);

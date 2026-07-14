@@ -63,13 +63,13 @@ async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ su
     // Reject low-resolution images (same threshold as BookmarkCard's onLoad).
     // Parse the base64 image dimensions to ensure we only cache HD favicons.
     const dims = await getImageDimensions(dataUri);
-    if (dims.width < 32 || dims.height < 32) {
+    if (dims.width < 128 || dims.height < 128) {
       return { success: false };
     }
 
     // Store in chrome.storage.local using the shared cache key constant.
-    // v3: invalidated v2 cache entries that may contain low-res 16×16 icons.
-    const CACHE_KEY = 'nahfi_favicon_cache_v3';
+    // v4: invalidated v3 cache entries that may contain 32px-127px icons.
+    const CACHE_KEY = 'nahfi_favicon_cache_v4';
     const result = await new Promise<Record<string, unknown>>((resolve) => {
       chrome.storage.local.get(CACHE_KEY, (items) => {
         resolve(items as Record<string, unknown>);

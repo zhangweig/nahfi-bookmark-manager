@@ -21,9 +21,9 @@
 //   6. Google S2 favicon service (sz=256)     — requires VPN in China
 //   7. First-letter avatar (data URI)         — always works, final fallback
 //
-// onLoad threshold: images with naturalWidth < 32 are rejected (16×16
-// favicons are too blurry on modern displays). The chain advances to
-// the next source. If all sources return < 32px, the avatar is shown.
+// onLoad threshold: images with naturalWidth < 128 are rejected (16×16 or
+// 32×32 favicons are too blurry on modern displays). The chain advances to
+// the next source. If all sources return < 128px, the avatar is shown.
 
 export interface FaviconSource {
   url: string;
@@ -75,7 +75,7 @@ export function getFaviconChain(bookmarkUrl: string, size: number = 256): Favico
   // 3. Chrome internal favicon cache — reads from browser's own cache,
   //    no external network request. Instant and works offline.
   //    Demoted from position 0 because it frequently only has 16×16 icons.
-  //    The onLoad threshold (< 32px) will reject these and advance the chain.
+  //    The onLoad threshold (< 128px) will reject these and advance the chain.
   if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
     chain.push({
       url: chrome.runtime.getURL(
@@ -86,8 +86,8 @@ export function getFaviconChain(bookmarkUrl: string, size: number = 256): Favico
   }
 
   // 4. Direct /favicon.ico from the website itself.
-  //    Usually 16×16 or 32×32 — may be rejected by the < 32px threshold,
-  //    but 32×32 icons pass and are acceptable as a mid-quality fallback.
+  //    Usually 16×16 or 32×32 — rejected by the < 128px threshold.
+  //    Kept as a fallback for the rare high-resolution favicon.ico files.
   chain.push({
     url: `${origin}/favicon.ico`,
     name: 'direct',
@@ -115,8 +115,9 @@ export function getFaviconChain(bookmarkUrl: string, size: number = 256): Favico
 
 /** Minimum acceptable image dimension. Images smaller than this are
  *  rejected by the onLoad handler and the chain advances to the next source.
- *  32px is the threshold: 16×16 favicons are rejected, 32×32 are accepted. */
-export const FAVICON_MIN_SIZE = 32;
+ *  128px is the threshold: 16×16, 32×32 and 64×64 favicons are rejected,
+ *  128×128 and above are accepted and cached. */
+export const FAVICON_MIN_SIZE = 128;
 
 /**
  * Get a favicon URL. Kept for backward compatibility — prefer getFaviconChain().
