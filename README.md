@@ -11,6 +11,30 @@
 
 ---
 
+## 🚀 Quick Install
+
+### Option A: Download Pre-built Extension (No Node.js needed)
+
+1. Download [`nahfi-bookmark-manager.zip`](https://github.com/zhangweig/nahfi-bookmark-manager/releases/latest) from the [latest release](https://github.com/zhangweig/nahfi-bookmark-manager/releases/latest)
+2. Unzip to any folder
+3. Open Chrome → `chrome://extensions/`
+4. Enable **Developer mode** (top right toggle)
+5. Click **Load unpacked** → select the unzipped folder
+6. Done! 🎉
+
+### Option B: Build from Source
+
+```bash
+git clone https://github.com/zhangweig/nahfi-bookmark-manager.git
+cd nahfi-bookmark-manager
+npm install
+npm run build
+```
+
+Then load the `dist/` folder in Chrome as above.
+
+---
+
 ## Overview
 
 Nahfi Bookmark Manager reimagines how you interact with your Chrome bookmarks. Instead of the default popup's tiny, plain list, Nahfi gives you a spacious, app-launcher-style grid with folder navigation, pinned shortcuts, visit tracking, drag-and-drop organization, and customizable folder icons — all wrapped in a polished Liquid Glass / Fluent Design aesthetic.
