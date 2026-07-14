@@ -6,6 +6,7 @@ import {
   getFaviconChain,
   generateAvatarDataUri,
   getInitial,
+  FAVICON_MIN_SIZE,
 } from '@/utils/favicon';
 import { cn } from '@/utils/helpers';
 import { CARD_SIZES, FAVICON_CACHE_TTL } from '@/constants';
@@ -200,9 +201,13 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
               if (!usingCache) setFaviconState((prev) => prev + 1);
             }}
             onLoad={(e) => {
-              // Reject tiny/transparent placeholder images (e.g. 1x1 tracking pixels)
+              // Reject low-resolution images that will look blurry when
+              // scaled up to fill the card. 16×16 favicons are rejected;
+              // 32×32+ are accepted. This forces the chain to advance past
+              // Chrome's internal cache (which often only has 16×16) to
+              // reach high-res sources like apple-touch-icon (180px).
               const image = e.currentTarget;
-              if (image.naturalWidth <= 1 && image.naturalHeight <= 1) {
+              if (image.naturalWidth < FAVICON_MIN_SIZE || image.naturalHeight < FAVICON_MIN_SIZE) {
                 if (!usingCache) setFaviconState((prev) => prev + 1);
                 return;
               }

@@ -8,10 +8,12 @@ export const STORAGE_KEYS = {
   RECENT: 'nahfi_recent_visits',
   SETTINGS: 'nahfi_settings',
   LAST_FOLDER: 'nahfi_last_folder',
-  // v2: cache key bumped to invalidate old low-res cached favicons.
-  // The new chain prioritizes apple-touch-icon (180px) and android-chrome
-  // (192px) over /favicon.ico (16-32px), so all new cache entries are HD.
-  FAVICON_CACHE: 'nahfi_favicon_cache_v2',
+  // v3: cache key bumped to invalidate v2 entries that may have cached
+  // low-res 16×16 favicons from Chrome's internal cache (which was
+  // position 0 in v2's chain). The new chain tries apple-touch-icon
+  // (180px) first and rejects images < 32px via onLoad threshold,
+  // so all new cache entries are HD.
+  FAVICON_CACHE: 'nahfi_favicon_cache_v3',
 } as const;
 
 // ─── Favicon Cache TTL ──────────────────────────────────────────

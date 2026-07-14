@@ -60,9 +60,16 @@ async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ su
 
     const dataUri = await blobToDataUri(blob);
 
+    // Reject low-resolution images (same threshold as BookmarkCard's onLoad).
+    // Parse the base64 image dimensions to ensure we only cache HD favicons.
+    const dims = await getImageDimensions(dataUri);
+    if (dims.width < 32 || dims.height < 32) {
+      return { success: false };
+    }
+
     // Store in chrome.storage.local using the shared cache key constant.
-    // This key was bumped to v2 to invalidate old low-res cached favicons.
-    const CACHE_KEY = 'nahfi_favicon_cache_v2';
+    // v3: invalidated v2 cache entries that may contain low-res 16×16 icons.
+    const CACHE_KEY = 'nahfi_favicon_cache_v3';
     const result = await new Promise<Record<string, unknown>>((resolve) => {
       chrome.storage.local.get(CACHE_KEY, (items) => {
         resolve(items as Record<string, unknown>);
@@ -86,6 +93,18 @@ function blobToDataUri(blob: Blob): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+/** Parse image dimensions from a data URI using OffscreenCanvas. */
+async function getImageDimensions(dataUri: string): Promise<{ width: number; height: number }> {
+  try {
+    const response = await fetch(dataUri);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+    return { width: bitmap.width, height: bitmap.height };
+  } catch {
+    return { width: 0, height: 0 };
+  }
 }
 
 // Handle messages from popup
