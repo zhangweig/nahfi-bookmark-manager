@@ -180,6 +180,9 @@ export function Popup() {
       className={cn(
         'glass-ios relative flex h-[420px] w-[640px] flex-col overflow-hidden rounded-3xl bg-white/75',
         'dark:bg-gray-950/80',
+        // Force a GPU layer for the popup container to prevent the corner tearing /
+        // right-angle bug that affects Chrome extension popups with rounded corners.
+        'translate-z-0',
       )}
     >
       {/* ── Toolbar ─────────────────────────────────────── */}
