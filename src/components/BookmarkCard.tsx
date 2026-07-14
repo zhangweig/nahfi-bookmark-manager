@@ -25,8 +25,8 @@ interface BookmarkCardProps {
 
 function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardProps) {
   // Favicon state: index into the favicon chain.
-  // Chain: 0=apple-touch(180) → 1=precomposed → 2=android-chrome(192)
-  //        → 3=Chrome cache → 4=favicon.ico → 5=DuckDuckGo → 6=Google → 7=Avatar
+  // Chain: 0=Google S2(512) → 1=apple-touch(180) → 2=precomposed → 3=android-chrome(192)
+  //        → 4=Chrome cache → 5=favicon.ico → 6=DuckDuckGo → 7=Avatar
   const [faviconState, setFaviconState] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const recordVisit = useStore((s) => s.recordVisit);
@@ -51,9 +51,10 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
   const cacheValid = cachedFavicon && Date.now() - cachedFavicon.timestamp < FAVICON_CACHE_TTL;
 
   // Build the favicon chain once per URL change.
-  // Request size=256 for crisp icons on high-DPI (Retina / 2x) displays.
+  // Request size=512 — the maximum Google S2 supports, giving us the
+  // highest quality icons even on Retina 2x displays.
   const faviconChain = useMemo(
-    () => getFaviconChain(node.url ?? '', 256),
+    () => getFaviconChain(node.url ?? '', 512),
     [node.url],
   );
 
@@ -204,10 +205,10 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
             onLoad={(e) => {
               // Reject low-resolution images that will look blurry when
               // scaled up to fill the card. Images below 128×128 are rejected;
-              // 128×128+ are accepted and cached. This is effective for direct
-              // sources (apple-touch, favicon.ico) where naturalWidth is the
-              // real resolution. Google S2 always returns the requested size
-              // so the threshold is a no-op for it.
+              // 128×128+ are accepted and cached. For Google S2 (position 0)
+              // this is a no-op — the service always returns the requested
+              // size (512). It IS effective for direct sources (apple-touch,
+              // favicon.ico) where naturalWidth reflects the true resolution.
               const image = e.currentTarget;
               if (image.naturalWidth < FAVICON_MIN_SIZE || image.naturalHeight < FAVICON_MIN_SIZE) {
                 if (!usingCache) setFaviconState((prev) => prev + 1);

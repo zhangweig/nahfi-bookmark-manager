@@ -8,14 +8,12 @@ export const STORAGE_KEYS = {
   RECENT: 'nahfi_recent_visits',
   SETTINGS: 'nahfi_settings',
   LAST_FOLDER: 'nahfi_last_folder',
-  // v6: multi-source chain restored. Previous v5 used Google S2 as the
-  // sole source (blocked in China → all icons fell back to letter avatars)
-  // with a 160px threshold that was ineffective (Google S2 always returns
-  // the requested size regardless of the original favicon resolution).
-  // v6 restores apple-touch-icon / android-chrome / favicon.ico / etc.
-  // as earlier sources so China users get real icons, and lowers the
-  // threshold to 128px (the user-requested value).
-  FAVICON_CACHE: 'nahfi_favicon_cache_v6',
+  // v7: Google S2 promoted to primary source (position 0) with sz=512.
+  // Previous v6 had Google as last fallback with sz=256. The CSS class
+  // .favicon-sharp also switched from crisp-edges (nearest-neighbor, caused
+  // aliasing) to auto (bilinear, smooth downscaling). Bumping the cache key
+  // invalidates entries cached from the old chain / rendering pipeline.
+  FAVICON_CACHE: 'nahfi_favicon_cache_v7',
 } as const;
 
 // ─── Favicon Quality Threshold ──────────────────────────────────
@@ -23,11 +21,11 @@ export const STORAGE_KEYS = {
 // Images below this are rejected by BookmarkCard's onLoad handler
 // and by the background SW's cache validator.
 // 128px: rejects 16×16 / 32×32 / 64×64 / 96×96 icons.
-// Accepted: apple-touch-icon (180), android-chrome (192), etc.
-// NOTE: Google S2 always returns the requested size (256) regardless
+// Accepted: Google S2 (512), apple-touch-icon (180), android-chrome (192), etc.
+// NOTE: Google S2 always returns the requested size (512) regardless
 // of the original resolution, so this threshold is a no-op for it.
-// It IS effective for direct sources where naturalWidth reflects
-// the true image resolution.
+// It IS effective for direct sources where naturalWidth reflects the
+// true image resolution.
 export const FAVICON_MIN_SIZE = 128;
 
 // ─── Favicon Cache TTL ──────────────────────────────────────────

@@ -1,37 +1,29 @@
 // ─── Favicon URL generation ─────────────────────────────────────
 // Multi-source favicon resolution with fallback chain.
 //
-// CRITICAL: The order matters for both quality and China accessibility.
+// Google S2 is the PRIMARY source (position 0) because:
+//   - It returns the highest-quality icons for the vast majority of sites
+//   - sz=512 requests the maximum resolution Google supports
+//   - Google has crawled and cached high-res favicons for millions of sites
+//   - The returned image is always exactly the requested size
 //
-// High-resolution direct sources are tried FIRST. Most modern websites
-// have apple-touch-icon.png (180x180), which loads instantly and is
-// crystal-clear on Retina displays. These are direct connections to the
-// website's own server — no VPN needed in China.
+// Direct sources (apple-touch, android-chrome, favicon.ico) follow as
+// fallbacks for when Google S2 is unreachable (e.g. in mainland China
+// without VPN) or returns a default globe placeholder.
 //
-// Chrome's internal favicon cache is demoted to position 3 because it
-// frequently only has a 16x16 version stored, resulting in blurry icons
-// even when size=256 is requested (the endpoint returns the native
-// resolution, not an upscaled version).
-//
-// Google S2 is kept as a LATE fallback (position 6) because it's blocked
-// in mainland China without VPN. For users outside China or with VPN,
-// it provides high-quality icons as a last resort.
-//
-//   0. apple-touch-icon.png (180x180)         — highest res, most sites have it
-//   1. apple-touch-icon-precomposed.png        — older iOS variant, same 180px
-//   2. android-chrome-192x192.png (192x192)   — PWA icon
-//   3. Chrome internal favicon cache (256)     — instant but often low-res
-//   4. Direct /favicon.ico from site            — low-res but works in China
-//   5. DuckDuckGo favicon service              — may work for some users
-//   6. Google S2 favicon service (sz=256)      — requires VPN in China
+//   0. Google S2 (sz=512)                     — highest quality, primary
+//   1. apple-touch-icon.png (180x180)          — direct, China-accessible
+//   2. apple-touch-icon-precomposed.png        — older iOS variant
+//   3. android-chrome-192x192.png (192x192)   — PWA icon
+//   4. Chrome internal favicon cache (256)     — instant but often low-res
+//   5. Direct /favicon.ico from site            — low-res but works in China
+//   6. DuckDuckGo favicon service              — may work for some users
 //   7. First-letter avatar (data URI)          — always works, final fallback
 //
 // onLoad threshold (FAVICON_MIN_SIZE = 128, defined in constants):
 // Images with naturalWidth < 128 are rejected; the chain advances.
-// This is effective for direct sources (apple-touch, favicon.ico, etc.)
-// where naturalWidth reflects the actual image resolution.
-// For Google S2 it's a no-op — the service always returns the requested
-// size regardless of the original favicon.
+// For Google S2 this is a no-op (always returns 512). It IS effective
+// for direct sources where naturalWidth reflects the true resolution.
 
 export interface FaviconSource {
   url: string;
@@ -58,32 +50,38 @@ export function getFaviconChain(bookmarkUrl: string, size: number = 256): Favico
 
   const chain: FaviconSource[] = [];
 
-  // 0. apple-touch-icon.png — 180x180 on most sites. High resolution,
-  //    works without VPN for Chinese sites. If the file doesn't exist,
-  //    the server returns 404 quickly (unlike Google's packet-drop timeout).
+  // 0. Google S2 favicon service — primary source. Returns the highest-
+  //    quality favicon available for the domain, always at the requested size.
+  //    sz=512 is the maximum Google supports, giving us crisp icons on all
+  //    display sizes including Retina 2x. If Google hasn't crawled the site
+  //    or is unreachable (China), onError advances the chain.
+  chain.push({
+    url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=${size}`,
+    name: 'google',
+  });
+
+  // 1. apple-touch-icon.png — 180x180 on most sites. High resolution,
+  //    works without VPN for Chinese sites. 404 returns instantly (no timeout).
   chain.push({
     url: `${origin}/apple-touch-icon.png`,
     name: 'apple-touch',
   });
 
-  // 1. apple-touch-icon-precomposed.png — older iOS variant, same 180x180.
-  //    Some sites only have this version, not the standard one.
+  // 2. apple-touch-icon-precomposed.png — older iOS variant, same 180x180.
   chain.push({
     url: `${origin}/apple-touch-icon-precomposed.png`,
     name: 'apple-touch-precomposed',
   });
 
-  // 2. android-chrome-192x192.png — PWA manifest icon, 192x192.
-  //    Very high resolution, available on sites with a web app manifest.
+  // 3. android-chrome-192x192.png — PWA manifest icon, 192x192.
   chain.push({
     url: `${origin}/android-chrome-192x192.png`,
     name: 'android-chrome',
   });
 
-  // 3. Chrome internal favicon cache — reads from browser's own cache,
+  // 4. Chrome internal favicon cache — reads from browser's own cache,
   //    no external network request. Instant and works offline.
-  //    Demoted from position 0 because it frequently only has 16x16 icons.
-  //    The onLoad threshold (< 128px) will reject these and advance the chain.
+  //    Often only has 16x16 icons, which get rejected by the 128px threshold.
   if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
     chain.push({
       url: chrome.runtime.getURL(
@@ -93,26 +91,17 @@ export function getFaviconChain(bookmarkUrl: string, size: number = 256): Favico
     });
   }
 
-  // 4. Direct /favicon.ico from the website itself.
+  // 5. Direct /favicon.ico from the website itself.
   //    Usually 16x16 or 32x32 — rejected by the < 128px threshold.
-  //    Kept as a fallback for the rare high-resolution favicon.ico files.
   chain.push({
     url: `${origin}/favicon.ico`,
     name: 'direct',
   });
 
-  // 5. DuckDuckGo favicon service — sometimes works in China, sometimes not.
+  // 6. DuckDuckGo favicon service — secondary fallback.
   chain.push({
     url: `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
     name: 'duckduckgo',
-  });
-
-  // 6. Google S2 favicon service — blocked in mainland China without VPN.
-  //    Requested at sz=256 for high-res when available.
-  //    Kept as a late fallback for users who have VPN or are outside China.
-  chain.push({
-    url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=${size}`,
-    name: 'google',
   });
 
   // 7. Avatar — always works, final fallback.

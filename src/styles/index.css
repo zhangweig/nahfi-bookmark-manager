@@ -233,12 +233,14 @@ body {
 }
 
 /* ─── Favicon sharp rendering ──────────────────────────────────── */
-/* Optimize favicon display for high-DPI screens. Chrome's default
-   image scaling can produce soft/blurry edges on small icons. */
+/* Optimize favicon display for high-DPI screens.
+   Use 'auto' (bilinear/bicubic interpolation) for smooth downscaling.
+   DO NOT use 'crisp-edges' — that forces nearest-neighbor which causes
+   aliasing and blurriness when downscaling 512px → 65px logos. */
 
 .favicon-sharp {
+  image-rendering: auto;
   image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
   -webkit-font-smoothing: antialiased;
   transform: translateZ(0);
   backface-visibility: hidden;

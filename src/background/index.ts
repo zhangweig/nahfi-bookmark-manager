@@ -63,11 +63,10 @@ async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ su
     const dataUri = await blobToDataUri(blob);
 
     // Reject low-resolution images. Uses the same threshold as BookmarkCard's
-    // onLoad handler (FAVICON_MIN_SIZE from constants). For direct sources
-    // (apple-touch-icon, favicon.ico) the image dimensions reflect the true
-    // resolution. For Google S2, the service always returns the requested size
-    // (256) so this check is a no-op — by the time we reach Google in the chain,
-    // all China-accessible sources have already failed.
+    // onLoad handler (FAVICON_MIN_SIZE from constants). Google S2 (now position 0)
+    // always returns the requested size (512) so this check is a no-op for it.
+    // For direct sources (apple-touch-icon, favicon.ico) the image dimensions
+    // reflect the true resolution and low-res icons are correctly rejected.
     const dims = await getImageDimensions(dataUri);
     if (dims.width < FAVICON_MIN_SIZE || dims.height < FAVICON_MIN_SIZE) {
       return { success: false };
