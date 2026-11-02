@@ -1,17 +1,25 @@
 {
   "manifest_version": 3,
   "name": "Nahfi Bookmark Manager",
-  "version": "1.0.0",
-  "description": "A modern, high-performance bookmark manager with glassmorphism UI. Better than Chrome's default bookmarks.",
-  "permissions": ["bookmarks", "storage", "favicon", "unlimitedStorage"],
-  "host_permissions": ["<all_urls>"],
+  "version": "1.1.0",
+  "description": "固定快速启动、无框 Liquid Glass 界面、高清图标本地缓存与 Chrome 账号同步。",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "favicon",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Nahfi Bookmark Manager",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "128": "icons/icon128.png",
+      "32": "icons/icon32.png"
     }
   },
   "background": {
@@ -21,7 +29,8 @@
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "128": "icons/icon128.png",
+    "32": "icons/icon32.png"
   },
   "commands": {
     "_execute_action": {

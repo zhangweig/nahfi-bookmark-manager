@@ -16,7 +16,8 @@ interface VirtualGridProps {
 
 function VirtualGridComponent({ items, metaMap, folderMetaMap, settings }: VirtualGridProps) {
   const cardSize = settings.cardSize;
-  const { width: itemWidth, height: itemHeight, gap } = CARD_SIZES[cardSize];
+  const { width: itemWidth, height, gap } = CARD_SIZES[cardSize];
+  const itemHeight = items.every(node => !node.url) ? itemWidth + 8 : height;
   const currentFolderId = useStore((s) => s.currentFolderId);
   const getScrollPosition = useStore((s) => s.getScrollPosition);
   const setScrollPosition = useStore((s) => s.setScrollPosition);

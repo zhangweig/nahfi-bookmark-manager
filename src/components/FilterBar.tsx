@@ -1,12 +1,11 @@
 import { memo } from 'react';
-import { LayoutGrid, Pin, Clock, TrendingUp } from 'lucide-react';
+import { LayoutGrid, Clock, TrendingUp } from 'lucide-react';
 import type { FilterType } from '@/types';
 import { cn } from '@/utils/helpers';
 import { useStore } from '@/store/useStore';
 
 const FILTERS: { value: FilterType; label: string; icon: typeof LayoutGrid }[] = [
   { value: 'all', label: 'All', icon: LayoutGrid },
-  { value: 'pinned', label: 'Pinned', icon: Pin },
   { value: 'recent', label: 'Recent', icon: Clock },
   { value: 'most-visited', label: 'Top', icon: TrendingUp },
 ];

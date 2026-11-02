@@ -83,6 +83,10 @@ export interface ConfirmDialogState {
 // ─── Favicon Cache ──────────────────────────────────────────────
 
 export interface FaviconCacheEntry {
+  width?: number;
+  height?: number;
+  source?: string;
+  qualityVersion?: number;
   dataUri: string; // base64 data URI
   timestamp: number; // when cached (ms epoch)
 }

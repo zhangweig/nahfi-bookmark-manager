@@ -1,3 +1,5 @@
+import { isSyncChange } from '@/utils/sync';
+import { QuickLaunch } from '@/components/QuickLaunch';
 import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { Settings as SettingsIcon, Menu } from 'lucide-react';
 import { useStore } from '@/store/useStore';
@@ -77,6 +79,22 @@ export function Popup() {
     setRecentVisits,
   ]);
 
+  useEffect(() => {
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && changes.nahfi_favicon_cache_v7?.newValue) {
+        useStore.setState({ faviconCacheMap: changes.nahfi_favicon_cache_v7.newValue });
+      }
+      if (area !== 'sync' || !isSyncChange(changes)) return;
+      storage.getAllMeta().then(setMetaMap).catch(console.error);
+      storage
+        .getSettings()
+        .then((settings) => useStore.setState({ settings }))
+        .catch(console.error);
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, [setMetaMap]);
+
   // Get sorted children of current folder (for 'all' filter)
   const folderChildren = useStore((s) => s.folderChildren);
   const sortedChildren = useMemo(
@@ -149,7 +167,7 @@ export function Popup() {
   // Loading state
   if (isLoading && sortedChildren.length === 0) {
     return (
-      <div className="glass-ios flex h-[420px] w-[640px] items-center justify-center rounded-3xl">
+      <div className="glass-ios flex h-[560px] w-[740px] items-center justify-center rounded-none">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
           <p className="text-sm text-gray-400">Loading bookmarks…</p>
@@ -161,7 +179,7 @@ export function Popup() {
   // Error state
   if (error) {
     return (
-      <div className="glass-ios flex h-[420px] w-[640px] items-center justify-center rounded-3xl">
+      <div className="glass-ios flex h-[560px] w-[740px] items-center justify-center rounded-none">
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm text-red-500">{error}</p>
           <button
@@ -178,7 +196,7 @@ export function Popup() {
   return (
     <div
       className={cn(
-        'glass-ios relative flex h-[420px] w-[640px] flex-col overflow-hidden rounded-3xl bg-white/75',
+        'glass-ios relative flex h-[560px] w-[740px] flex-col overflow-hidden rounded-none bg-white/75',
         'dark:bg-gray-950/80',
         // Force a GPU layer for the popup container to prevent the corner tearing /
         // right-angle bug that affects Chrome extension popups with rounded corners.
@@ -186,7 +204,7 @@ export function Popup() {
       )}
     >
       {/* ── Toolbar ─────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 border-b border-black/5 bg-white/45 px-3 pt-2.5 pb-2 shadow-sm shadow-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="toolbar flex shrink-0 items-center gap-1.5 border-b border-black/5 bg-white/45 px-3 pt-2.5 pb-2 shadow-sm shadow-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={cn(
@@ -214,12 +232,18 @@ export function Popup() {
         </button>
       </div>
 
+      <QuickLaunch />
+      <div className="section-heading folder-heading">
+        <h2>{filter === 'all' ? '书签与文件夹' : filter === 'recent' ? '最近访问' : '最常访问'}</h2>
+        <span>{displayItems.length} 项</span>
+      </div>
+
       {/* ── Main Content ────────────────────────────────── */}
       <div
         ref={gridContainerRef}
         onDragOver={handleContainerDragOver}
         onDrop={handleContainerDrop}
-        className="flex-1 overflow-hidden px-3 pb-3"
+        className="min-h-0 flex-1 overflow-hidden px-5 pb-4"
       >
         {displayItems.length > 0 ? (
           <VirtualGrid

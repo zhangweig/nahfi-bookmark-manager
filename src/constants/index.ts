@@ -16,23 +16,15 @@ export const STORAGE_KEYS = {
   FAVICON_CACHE: 'nahfi_favicon_cache_v7',
 } as const;
 
-// ─── Favicon Quality Threshold ──────────────────────────────────
-// Minimum acceptable image dimension (both width AND height).
-// Images below this are rejected by BookmarkCard's onLoad handler
-// and by the background SW's cache validator.
-// 128px: rejects 16×16 / 32×32 / 64×64 / 96×96 icons.
-// Accepted: Google S2 (512), apple-touch-icon (180), android-chrome (192), etc.
-// NOTE: Google S2 always returns the requested size (512) regardless
-// of the original resolution, so this threshold is a no-op for it.
-// It IS effective for direct sources where naturalWidth reflects the
-// true image resolution.
-export const FAVICON_MIN_SIZE = 128;
+// Accept standard 16px favicons; resolution alone does not indicate failure.
+export const FAVICON_MIN_SIZE = 16;
+export const ICON_QUALITY_VERSION = 2;
 
 // ─── Favicon Cache TTL ──────────────────────────────────────────
 
 // Cache entries expire after 7 days. On read, expired entries are
 // treated as misses and re-fetched from network sources.
-export const FAVICON_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+export const FAVICON_CACHE_TTL = Number.POSITIVE_INFINITY; // Retained until explicitly refreshed or extension data is removed
 
 // ─── Default Settings ───────────────────────────────────────────
 
@@ -54,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const CARD_SIZES = {
   small: { width: 96, height: 124, gap: 6 },
-  medium: { width: 116, height: 154, gap: 8 },
+  medium: { width: 104, height: 136, gap: 10 },
   large: { width: 146, height: 192, gap: 10 },
 } as const;
 

@@ -47,7 +47,7 @@ function ContextMenuComponent() {
   if (!visible || !target) return null;
 
   // Adjust position to keep menu in viewport
-  const menuWidth = 180;
+  const menuWidth = 230;
   const menuHeight = isFolder ? 200 : 290;
   const adjustedX = Math.min(x, window.innerWidth - menuWidth - 8);
   const adjustedY = Math.min(y, window.innerHeight - menuHeight - 8);
@@ -133,7 +133,7 @@ function ContextMenuComponent() {
         {
           type: 'item',
           icon: isPinned ? PinOff : Pin,
-          label: isPinned ? 'Unpin' : 'Pin',
+          label: isPinned ? '从快速启动移除' : '添加到快速启动',
           action: handlePin,
         },
         { type: 'item', icon: Copy, label: 'Copy URL', action: handleCopyUrl },

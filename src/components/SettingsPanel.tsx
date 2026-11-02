@@ -1,3 +1,4 @@
+import { SyncPanel } from './SyncPanel';
 import { memo } from 'react';
 import { X, Sun, Moon, Monitor, Plus, FolderPlus } from 'lucide-react';
 import type { CardSize, Settings } from '@/types';
@@ -127,12 +128,14 @@ function SettingsPanelComponent() {
             />
           </SettingSection>
 
+          <SyncPanel />
+
           {/* Info */}
           <div className="rounded-xl bg-black/5 p-3 text-center dark:bg-white/5">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Nahfi Bookmark Manager
               <br />
-              v1.0.0
+              v{chrome.runtime.getManifest?.().version ?? '1.1.0'}
             </p>
           </div>
         </div>

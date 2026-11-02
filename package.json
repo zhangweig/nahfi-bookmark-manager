@@ -1,7 +1,7 @@
 {
   "name": "nahfi-bookmark-manager",
-  "version": "1.0.0",
-  "description": "A modern, high-performance Chrome bookmark manager with glassmorphism UI",
+  "version": "1.1.0",
+  "description": "Chrome bookmark manager with fixed Quick Launch, frameless Liquid Glass UI, account sync and persistent high-resolution icons",
   "author": "Zhang WeiGuang",
   "license": "MIT",
   "keywords": [
@@ -28,7 +28,9 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "test": "node tests/sync.test.mjs && node tests/favicon.test.mjs && node tests/icon-cache.test.mjs",
+    "package": "npm run build && python3 scripts/package-extension.py"
   },
   "dependencies": {
     "lucide-react": "^0.408.0",

@@ -1,20 +1,11 @@
-import { memo, useState, useCallback, useRef, useMemo } from 'react';
-import { Pin } from 'lucide-react';
+import { memo, useState, useCallback } from 'react';
 import type { BookmarkNode, BookmarkMeta, Settings, CardSize } from '@/types';
-import {
-  getDomain,
-  getFaviconChain,
-  generateAvatarDataUri,
-  getInitial,
-} from '@/utils/favicon';
+import { getDomain } from '@/utils/favicon';
+import { SiteIcon } from './SiteIcon';
 import { cn } from '@/utils/helpers';
-import { CARD_SIZES, FAVICON_CACHE_TTL, FAVICON_MIN_SIZE } from '@/constants';
+import { CARD_SIZES } from '@/constants';
 import { useStore } from '@/store/useStore';
 import { getInternalDragData, setInternalDragData } from '@/utils/drag';
-
-// Track hostname favicon cache requests per popup session to avoid duplicate
-// background messages when multiple bookmarks share the same domain.
-const faviconCacheRequested = new Set<string>();
 
 interface BookmarkCardProps {
   node: BookmarkNode;
@@ -24,46 +15,10 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardProps) {
-  // Favicon state: index into the favicon chain.
-  // Chain: 0=Google S2(512) → 1=apple-touch(180) → 2=precomposed → 3=android-chrome(192)
-  //        → 4=Chrome cache → 5=favicon.ico → 6=DuckDuckGo → 7=Avatar
-  const [faviconState, setFaviconState] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const recordVisit = useStore((s) => s.recordVisit);
   const openContextMenu = useStore((s) => s.openContextMenu);
   const moveNode = useStore((s) => s.moveNode);
-  const retryCount = useStore((s) => s.faviconRetryMap[node.id] ?? 0);
-  const setFaviconCacheEntry = useStore((s) => s.setFaviconCacheEntry);
-
-  // Extract hostname for cache lookup
-  const hostname = useMemo(() => {
-    try {
-      return new URL(node.url ?? '').hostname;
-    } catch {
-      return '';
-    }
-  }, [node.url]);
-
-  // Check local favicon cache (from chrome.storage.local, loaded into store on init)
-  const cachedFavicon = useStore((s) =>
-    hostname ? s.faviconCacheMap[hostname] : undefined,
-  );
-  const cacheValid = cachedFavicon && Date.now() - cachedFavicon.timestamp < FAVICON_CACHE_TTL;
-
-  // Build the favicon chain once per URL change.
-  // Request size=512 — the maximum Google S2 supports, giving us the
-  // highest quality icons even on Retina 2x displays.
-  const faviconChain = useMemo(
-    () => getFaviconChain(node.url ?? '', 512),
-    [node.url],
-  );
-
-  // When retry is triggered from context menu, reset favicon state to try again
-  const prevRetryCount = useRef(retryCount);
-  if (retryCount !== prevRetryCount.current) {
-    prevRetryCount.current = retryCount;
-    setFaviconState(0); // Reset to try primary source again
-  }
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -150,21 +105,17 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
 
   const titleText = meta?.customName || node.title || 'Untitled';
 
-  // Resolve current favicon source.
-  // Priority: local cache → network chain → avatar fallback
-  const avatarIndex = faviconChain.length - 1; // last entry is always 'avatar'
-
-  const faviconSrc = cacheValid
-    ? cachedFavicon!.dataUri
-    : faviconState < avatarIndex
-      ? faviconChain[faviconState].url
-      : generateAvatarDataUri(getInitial(titleText), titleText);
-
-  // Whether we're showing a cached favicon (no network needed)
-  const usingCache = !!cacheValid;
-
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={titleText}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          recordVisit(node);
+        }
+      }}
       draggable
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -174,10 +125,10 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'glass-card group relative flex cursor-pointer flex-col items-center justify-start overflow-hidden rounded-2xl border border-white/45',
+        'bookmark-card group relative flex cursor-pointer flex-col items-center justify-start',
         'transition-all duration-200',
-        'hover:bg-white/70 hover:shadow-lg hover:shadow-black/10',
-        'dark:border-white/10 dark:hover:bg-white/10',
+        'hover:brightness-110',
+
         sz.padding,
         sz.gap,
         isDragOver && 'ring-2 ring-blue-400',
@@ -192,72 +143,7 @@ function BookmarkCardComponent({ node, meta, settings, cardSize }: BookmarkCardP
           sz.iconWrap,
         )}
       >
-        {showFavicon && node.url && (usingCache || faviconState < avatarIndex) ? (
-          <div className="favicon-bg flex h-[78%] w-[78%] items-center justify-center rounded-xl">
-            <img
-              key={`${node.id}-fav-${usingCache ? 'cache' : faviconState}-${retryCount}`}
-              src={faviconSrc}
-              alt=""
-              className="h-full w-full object-contain favicon-sharp"
-              onError={() => {
-                if (!usingCache) setFaviconState((prev) => prev + 1);
-              }}
-            onLoad={(e) => {
-              // Reject low-resolution images that will look blurry when
-              // scaled up to fill the card. Images below 128×128 are rejected;
-              // 128×128+ are accepted and cached. For Google S2 (position 0)
-              // this is a no-op — the service always returns the requested
-              // size (512). It IS effective for direct sources (apple-touch,
-              // favicon.ico) where naturalWidth reflects the true resolution.
-              const image = e.currentTarget;
-              if (image.naturalWidth < FAVICON_MIN_SIZE || image.naturalHeight < FAVICON_MIN_SIZE) {
-                if (!usingCache) setFaviconState((prev) => prev + 1);
-                return;
-              }
-
-              // Cache successful favicon from network sources (not cache, not avatar)
-              if (!usingCache && hostname && !faviconCacheRequested.has(hostname)) {
-                faviconCacheRequested.add(hostname);
-                const source = faviconChain[faviconState];
-                if (source && source.name !== 'avatar') {
-                  // Ask background SW to fetch + cache this favicon as base64
-                  chrome.runtime.sendMessage(
-                    { type: 'CACHE_FAVICON', url: source.url, hostname },
-                    (response) => {
-                      // Always check lastError: popup may close before background responds
-                      if (chrome.runtime.lastError) {
-                        // Remove from requested set so next popup can retry
-                        faviconCacheRequested.delete(hostname);
-                        return;
-                      }
-                      if (response?.success && response.dataUri) {
-                        setFaviconCacheEntry(hostname, response.dataUri);
-                      }
-                    },
-                  );
-                }
-              }
-            }}
-            loading="lazy"
-            draggable={false}
-          />
-          </div>
-        ) : (
-          /* First-letter avatar — colorful gradient + white letter */
-          <img
-            src={generateAvatarDataUri(getInitial(titleText), titleText)}
-            alt=""
-            className="h-full w-full"
-            draggable={false}
-          />
-        )}
-
-        {/* Pin badge overlay */}
-        {meta?.pinned && (
-          <div className="absolute right-1 top-1 z-10 rounded-full bg-amber-400 p-0.5 shadow-sm">
-            <Pin className={cn('h-2.5 w-2.5 text-white', enableAnim && 'animate-scale-in')} />
-          </div>
-        )}
+        <SiteIcon id={node.id} url={node.url ?? ''} title={titleText} enabled={showFavicon} />
       </div>
 
       {/* Title — single line, width matches icon */}

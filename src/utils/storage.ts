@@ -1,3 +1,5 @@
+import { getBookmarkTree, getBookmarkNode, flattenBookmarks } from './bookmarks';
+import { syncQuickLaunch, saveQuickLaunch, readSyncedSettings, saveSyncedSettings } from './sync';
 import type {
   BookmarkMeta,
   FolderMeta,
@@ -29,7 +31,13 @@ function setToStorage<T>(key: string, value: T): Promise<void> {
 // ─── Bookmark Meta ──────────────────────────────────────────────
 
 export async function getAllMeta(): Promise<MetaStorage> {
-  return getFromStorage<MetaStorage>(STORAGE_KEYS.META, {});
+  const [local, tree] = await Promise.all([
+    getFromStorage<MetaStorage>(STORAGE_KEYS.META, {}),
+    getBookmarkTree(),
+  ]);
+  const merged = await syncQuickLaunch(tree, local);
+  await setToStorage(STORAGE_KEYS.META, merged);
+  return merged;
 }
 
 export async function getMeta(bookmarkId: string): Promise<BookmarkMeta> {
@@ -53,6 +61,22 @@ export async function setMeta(bookmarkId: string, meta: Partial<BookmarkMeta>): 
     customTags: [],
   };
   all[bookmarkId] = { ...existing, ...meta };
+  if (meta.pinned !== undefined && meta.pinned !== existing.pinned) {
+    const node = await getBookmarkNode(bookmarkId);
+    if (node?.url) {
+      for (const duplicate of flattenBookmarks(await getBookmarkTree())) {
+        if (duplicate.url === node.url) {
+          all[duplicate.id] = {
+            ...(all[duplicate.id] ?? { visitCount: 0, lastVisited: null, customTags: [] }),
+            pinned: meta.pinned,
+          };
+        }
+      }
+      await setToStorage(STORAGE_KEYS.META, all);
+      await saveQuickLaunch(node.url, meta.pinned);
+      return;
+    }
+  }
   await setToStorage(STORAGE_KEYS.META, all);
 }
 
@@ -121,11 +145,15 @@ export async function addRecentVisit(visit: RecentVisit): Promise<void> {
 // ─── Settings ───────────────────────────────────────────────────
 
 export async function getSettings(): Promise<Settings> {
-  return getFromStorage<Settings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  const local = await getFromStorage<Settings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  const settings = { ...DEFAULT_SETTINGS, ...local, ...(await readSyncedSettings()) };
+  await setToStorage(STORAGE_KEYS.SETTINGS, settings);
+  return settings;
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
   await setToStorage(STORAGE_KEYS.SETTINGS, settings);
+  await saveSyncedSettings(settings);
 }
 
 // ─── Last Folder ────────────────────────────────────────────────

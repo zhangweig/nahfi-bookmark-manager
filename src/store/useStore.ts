@@ -95,7 +95,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   // ── Initial UI ──
   settings: DEFAULT_SETTINGS,
-  filter: 'pinned' as FilterType,
+  filter: 'all' as FilterType,
   isLoading: true,
   error: null,
   contextMenu: { visible: false, x: 0, y: 0, target: null, isFolder: false },
@@ -199,9 +199,16 @@ export const useStore = create<StoreState>((set, get) => ({
     const newMeta: BookmarkMeta = { ...current, pinned: !current.pinned };
     await storage.setMeta(bookmarkId, newMeta);
 
-    set((state) => ({
-      metaMap: { ...state.metaMap, [bookmarkId]: newMeta },
-    }));
+    set((state) => {
+      const url = state.allBookmarks.find(node => node.id === bookmarkId)?.url;
+      const metaMap = { ...state.metaMap, [bookmarkId]: newMeta };
+      for (const node of state.allBookmarks) {
+        if (url && node.url === url) {
+          metaMap[node.id] = { ...newMeta, ...state.metaMap[node.id], pinned: newMeta.pinned };
+        }
+      }
+      return { metaMap };
+    });
   },
 
   recordVisit: async (node: BookmarkNode) => {
@@ -218,7 +225,7 @@ export const useStore = create<StoreState>((set, get) => ({
       visitCount: current.visitCount + 1,
       lastVisited: Date.now(),
     };
-    await storage.setMeta(node.id, newMeta);
+    await storage.setMeta(node.id, { visitCount: newMeta.visitCount, lastVisited: newMeta.lastVisited });
 
     const visit: RecentVisit = {
       id: node.id,

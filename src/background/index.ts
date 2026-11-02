@@ -2,7 +2,7 @@
 // Handles extension lifecycle, bookmark change events, and favicon caching.
 // Notifies popup when bookmarks change so it can refresh in real-time.
 
-import { STORAGE_KEYS, FAVICON_MIN_SIZE } from '@/constants';
+import { readIconCache, resolveBestIcon, ICON_VERSION } from '@/utils/icon-cache';
 
 // On install
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -45,71 +45,51 @@ chrome.bookmarks.onMoved.addListener((id, _moveInfo) => {
   notifyPopup('moved');
 });
 
-// ─── Favicon Caching ────────────────────────────────────────────
-
-/**
- * Fetch an image URL, convert to base64 data URI, and store in chrome.storage.local.
- * Called by popup when a favicon loads successfully from a network source.
- */
-async function fetchAndCacheFavicon(url: string, hostname: string): Promise<{ success: boolean; dataUri?: string }> {
+// Warm the persistent cache after installation, updates and browser startup.
+// Two sites at a time; cached sites do not issue network requests.
+let warming = false;
+async function warmIcons() {
+  if (warming) return;
+  warming = true;
   try {
-    const response = await fetch(url);
-    if (!response.ok) return { success: false };
-
-    const blob = await response.blob();
-    // Skip if not an image or too small (likely a placeholder)
-    if (!blob.type.startsWith('image/') || blob.size < 100) return { success: false };
-
-    const dataUri = await blobToDataUri(blob);
-
-    // Reject low-resolution images. Uses the same threshold as BookmarkCard's
-    // onLoad handler (FAVICON_MIN_SIZE from constants). Google S2 (now position 0)
-    // always returns the requested size (512) so this check is a no-op for it.
-    // For direct sources (apple-touch-icon, favicon.ico) the image dimensions
-    // reflect the true resolution and low-res icons are correctly rejected.
-    const dims = await getImageDimensions(dataUri);
-    if (dims.width < FAVICON_MIN_SIZE || dims.height < FAVICON_MIN_SIZE) {
-      return { success: false };
-    }
-
-    // Store in chrome.storage.local using the shared cache key constant.
-    const CACHE_KEY = STORAGE_KEYS.FAVICON_CACHE;
-    const result = await new Promise<Record<string, unknown>>((resolve) => {
-      chrome.storage.local.get(CACHE_KEY, (items) => {
-        resolve(items as Record<string, unknown>);
+    const tree = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) =>
+      chrome.bookmarks.getTree(resolve),
+    );
+    const cache = await readIconCache();
+    const urls = new Map<string, string>();
+    const walk = (nodes: chrome.bookmarks.BookmarkTreeNode[]) =>
+      nodes.forEach((node) => {
+        if (node.url) {
+          try {
+            const url = new URL(node.url);
+            if (
+              ['http:', 'https:'].includes(url.protocol) &&
+              cache[url.hostname]?.qualityVersion !== ICON_VERSION
+            )
+              urls.set(url.hostname, node.url);
+          } catch {
+            /* Ignore non-web bookmarks. */
+          }
+        }
+        if (node.children) walk(node.children);
       });
-    });
-    const cache = (result[CACHE_KEY] as Record<string, { dataUri: string; timestamp: number }>) ?? {};
-    cache[hostname] = { dataUri, timestamp: Date.now() };
-    await chrome.storage.local.set({ [CACHE_KEY]: cache });
-
-    return { success: true, dataUri };
-  } catch (err) {
-    console.warn('[Nahfi] Favicon cache failed for', hostname, err);
-    return { success: false };
+    walk(tree);
+    const pending = [...urls.values()];
+    for (let index = 0; index < pending.length; index += 2)
+      await Promise.allSettled(pending.slice(index, index + 2).map((url) => resolveBestIcon(url)));
+  } finally {
+    warming = false;
   }
 }
-
-function blobToDataUri(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-/** Parse image dimensions from a data URI using createImageBitmap. */
-async function getImageDimensions(dataUri: string): Promise<{ width: number; height: number }> {
-  try {
-    const response = await fetch(dataUri);
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
-    return { width: bitmap.width, height: bitmap.height };
-  } catch {
-    return { width: 0, height: 0 };
-  }
-}
+chrome.runtime.onInstalled.addListener(() => {
+  void warmIcons().catch(console.error);
+});
+chrome.runtime.onStartup.addListener(() => {
+  void warmIcons().catch(console.error);
+});
+chrome.bookmarks.onCreated.addListener((_id, bookmark) => {
+  if (bookmark.url) void resolveBestIcon(bookmark.url).catch(console.error);
+});
 
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -128,10 +108,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true; // async response
   }
 
-  if (message.type === 'CACHE_FAVICON') {
-    fetchAndCacheFavicon(message.url as string, message.hostname as string)
-      .then((result) => sendResponse(result))
+  if (message.type === 'RESOLVE_FAVICON') {
+    resolveBestIcon(String(message.pageUrl), message.force === true)
+      .then((entry) => sendResponse({ success: !!entry, entry }))
       .catch(() => sendResponse({ success: false }));
-    return true; // async response
+    return true;
   }
 });

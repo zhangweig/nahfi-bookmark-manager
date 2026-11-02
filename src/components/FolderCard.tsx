@@ -107,6 +107,15 @@ function FolderCardComponent({ node, folderMeta, settings, cardSize }: FolderCar
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={titleText}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleClick();
+        }
+      }}
       draggable
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -116,24 +125,29 @@ function FolderCardComponent({ node, folderMeta, settings, cardSize }: FolderCar
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       className={cn(
-        'group relative flex cursor-pointer flex-col items-center justify-start',
+        'folder-card group relative flex cursor-pointer flex-col items-center justify-start',
         'transition-all duration-200',
         sz.gap,
         enableAnim && 'hover:-translate-y-0.5',
       )}
-      style={{ height: cardDims.height, width: cardDims.width }}
+      style={{ height: cardDims.width + 8, width: cardDims.width }}
     >
       <div
         className={cn(
-          'glass-card flex flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/45',
-          'transition-all duration-200 group-hover:bg-white/70 group-hover:shadow-lg group-hover:shadow-black/10',
-          'dark:border-white/10 dark:group-hover:bg-white/10',
+          'folder-icon flex flex-shrink-0 items-center justify-center',
+          'transition-transform duration-200',
           isDragOver && 'ring-2 ring-blue-400',
         )}
-        style={{ height: cardDims.width, width: cardDims.width }}
+        style={{ height: cardDims.width * 0.8, width: cardDims.width }}
       >
         <span className={cn('leading-none drop-shadow-sm', sz.emojiSize)}>
-          {folderMeta?.customIcon || '📁'}
+          {folderMeta?.customIcon ? (
+            folderMeta.customIcon
+          ) : (
+            <span className="liquid-folder">
+              <span />
+            </span>
+          )}
         </span>
       </div>
 
