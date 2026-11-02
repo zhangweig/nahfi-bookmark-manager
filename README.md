@@ -6,6 +6,20 @@
 
 **当前版本：1.1.0** · [更新记录](CHANGELOG.md) · [版本标签](https://github.com/zhangweig/nahfi-bookmark-manager/tree/v1.1.0) · [MIT 许可证](LICENSE)
 
+## 界面截图
+
+### 显示设置与跨电脑同步
+
+支持卡片大小、URL 显示、网站图标和动画开关，并在设置面板展示 Chrome 同步说明与提交状态。
+
+![显示设置与跨电脑同步面板](docs/screenshots/settings-sync.png)
+
+### 文件夹编辑与自定义图标
+
+编辑文件夹名称，选择 Emoji 图标，保存后用于书签文件夹网格。
+
+![文件夹名称与 Emoji 图标编辑面板](docs/screenshots/folder-editor.png)
+
 ## 下载与安装
 
 **[下载最新扩展 ZIP](https://raw.githubusercontent.com/zhangweig/nahfi-bookmark-manager/main/nahfi-bookmark-manager.zip)** · [GitHub Releases](https://github.com/zhangweig/nahfi-bookmark-manager/releases)
