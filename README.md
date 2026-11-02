@@ -14,6 +14,12 @@
 
 ![主页、快速启动与书签文件夹网格](docs/screenshots/home.png)
 
+### 浅色主题与个性化文件夹
+
+浅色 Liquid Glass 界面，展示快速启动以及使用 Emoji 自定义图标的书签文件夹。
+
+![浅色主题与自定义文件夹图标](docs/screenshots/home-light.png)
+
 ### 显示设置与跨电脑同步
 
 支持卡片大小、URL 显示、网站图标和动画开关，并在设置面板展示 Chrome 同步说明与提交状态。
